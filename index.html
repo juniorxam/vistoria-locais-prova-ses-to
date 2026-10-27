@@ -71,10 +71,10 @@
           <div><label for="auth-email" class="block text-sm font-medium mb-1">E-mail</label><input id="auth-email" type="email" required autocomplete="username" class="w-full border border-slate-300 rounded-lg p-3" placeholder="seu@email.com"></div>
           <div><label for="auth-password" class="block text-sm font-medium mb-1">Senha</label><input id="auth-password" type="password" required minlength="6" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg p-3" placeholder="Sua senha"></div>
           <button id="auth-submit" class="w-full bg-sky-700 hover:bg-sky-800 text-white rounded-lg p-3 font-semibold" type="submit">Entrar</button>
-          <button id="auth-signup" class="w-full border border-slate-300 hover:bg-slate-50 rounded-lg p-3 font-semibold" type="button">Criar conta</button>
+          <button id="auth-signup" class="w-full border border-slate-300 hover:bg-slate-50 rounded-lg p-3 font-semibold" type="button">Ativar conta do administrador principal</button>
           <p id="auth-message" class="text-sm text-center text-rose-600" role="status"></p>
         </form>
-        <p class="text-xs text-slate-400 text-center">Seus registros são protegidos por autenticação e políticas de acesso do Supabase.</p>
+        <p class="text-xs text-slate-400 text-center">Acesso restrito a usuários autorizados. O cadastro inicial é exclusivo do administrador principal.</p>
       </div>
     </section>
     <div id="app-root" class="hidden flex flex-col min-h-screen">
@@ -125,6 +125,7 @@
                 <button onclick="resetData()" class="text-rose-400 hover:underline flex items-center space-x-1">
                     <i class="fa-solid fa-trash-can"></i> <span>Limpar Dados</span>
                 </button>
+                <button id="admin-users-button" onclick="toggleUserManagement()" class="hidden text-amber-300 hover:underline flex items-center space-x-1"><i class="fa-solid fa-users-gear"></i><span>Gerenciar usuários</span></button>
                 <button onclick="signOut()" class="text-slate-300 hover:underline flex items-center space-x-1"><i class="fa-solid fa-right-from-bracket"></i><span>Sair</span></button>
             </div>
         </div>
@@ -132,6 +133,19 @@
 
     <!-- Conteúdo Principal -->
     <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <section id="user-management-panel" class="hidden mb-6 bg-white rounded-xl border border-amber-200 shadow-sm p-5 space-y-4">
+          <div class="flex items-start justify-between gap-4">
+            <div><h2 class="text-lg font-bold text-slate-900"><i class="fa-solid fa-users-gear text-amber-600 mr-2"></i>Gerenciamento de usuários</h2>
+            <p class="text-sm text-slate-600 mt-1">Somente o administrador principal pode convidar usuários. Todos os usuários autorizados compartilham as vistorias.</p></div>
+            <button type="button" onclick="toggleUserManagement(false)" class="text-slate-500 hover:text-slate-900" aria-label="Fechar gerenciamento"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <form id="invite-user-form" class="flex flex-col sm:flex-row gap-3">
+            <div class="flex-1"><label for="invite-user-email" class="block text-sm font-medium text-slate-700 mb-1">E-mail do usuário</label>
+            <input id="invite-user-email" type="email" required class="w-full border border-slate-300 rounded-lg p-3" placeholder="nome@exemplo.com"></div>
+            <div class="flex items-end"><button id="invite-user-submit" type="submit" class="bg-sky-700 hover:bg-sky-800 text-white rounded-lg px-5 py-3 font-semibold"><i class="fa-solid fa-paper-plane mr-2"></i>Enviar convite</button></div>
+          </form>
+          <p id="invite-user-message" class="text-sm" role="status"></p>
+        </section>
 
         <!-- ================= ABAS: DASHBOARD ================= -->
         <section id="section-dashboard" class="space-y-6">
@@ -716,6 +730,7 @@
         const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_KyFPavUchZsOzwIEhYRr9A_5WGXUzeX';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
         let activeUser = null;
+        let activeRole = null;
 
         function setAuthMessage(message, isError = true) {
             const el = document.getElementById('auth-message');
@@ -736,18 +751,61 @@
         }
         async function activateSession(session) {
             activeUser = session?.user || null;
+            activeRole = null;
+            document.getElementById('admin-users-button').classList.add('hidden');
+            document.getElementById('user-management-panel').classList.add('hidden');
             document.getElementById('auth-gate').classList.toggle('hidden', !!activeUser);
             document.getElementById('app-root').classList.toggle('hidden', !activeUser);
             if (activeUser) {
+                const { data: access, error: accessError } = await supabaseClient.functions.invoke('manage-users', { body: { action: 'session' } });
+                if (accessError || !access?.role) {
+                    const message = access?.error || accessError?.message || 'Esta conta não está autorizada.';
+                    await supabaseClient.auth.signOut();
+                    document.getElementById('auth-gate').classList.remove('hidden');
+                    document.getElementById('app-root').classList.add('hidden');
+                    setAuthMessage(message);
+                    return;
+                }
+                activeRole = access.role;
+                if (activeRole === 'principal_admin') document.getElementById('admin-users-button').classList.remove('hidden');
                 renderChecklist();
                 document.getElementById('capacity-table-body').innerHTML = '';
                 document.getElementById('nc-table-body').innerHTML = '';
                 addCapacityRow(); addNcRow();
                 await loadCloudInspections();
             } else {
+                activeRole = null;
                 inspections = [];
             }
         }
+        function toggleUserManagement(force) {
+            if (activeRole !== 'principal_admin') return;
+            const panel = document.getElementById('user-management-panel');
+            const shouldShow = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
+            panel.classList.toggle('hidden', !shouldShow);
+            if (shouldShow) document.getElementById('invite-user-email').focus();
+        }
+        document.getElementById('invite-user-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (activeRole !== 'principal_admin') return;
+            const input = document.getElementById('invite-user-email');
+            const button = document.getElementById('invite-user-submit');
+            const message = document.getElementById('invite-user-message');
+            button.disabled = true; button.textContent = 'Enviando...';
+            message.textContent = '';
+            const { data, error } = await supabaseClient.functions.invoke('manage-users', {
+                body: { action: 'invite', email: input.value.trim() }
+            });
+            if (error || data?.error) {
+                message.className = 'text-sm text-rose-600';
+                message.textContent = data?.error || error?.message || 'Falha ao enviar convite.';
+            } else {
+                message.className = 'text-sm text-emerald-700';
+                message.textContent = data.message || 'Convite enviado.';
+                input.value = '';
+            }
+            button.disabled = false; button.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>Enviar convite';
+        });
         document.getElementById('auth-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const button = document.getElementById('auth-submit'); button.disabled = true; button.textContent = 'Entrando...';
@@ -760,13 +818,13 @@
         });
         document.getElementById('auth-signup').addEventListener('click', async () => {
             setAuthMessage('');
-            const email = document.getElementById('auth-email').value.trim();
+            const email = document.getElementById('auth-email').value.trim().toLowerCase();
             const password = document.getElementById('auth-password').value;
-            if (!email || password.length < 6) { setAuthMessage('Informe um e-mail e uma senha com pelo menos 6 caracteres.'); return; }
-            const { data, error } = await supabaseClient.auth.signUp({ email, password });
-            if (error) setAuthMessage('Não foi possível criar a conta: ' + error.message);
-            else if (data.session) setAuthMessage('Conta criada e acesso liberado.', false);
-            else setAuthMessage('Conta criada. Confira seu e-mail para confirmar o cadastro antes de entrar.', false);
+            if (email !== 'juniorxamdev@gmail.com') { setAuthMessage('O cadastro público está desativado. Use o e-mail do administrador principal para ativar a conta inicial.'); return; }
+            if (!password || password.length < 6) { setAuthMessage('Informe uma senha com pelo menos 6 caracteres.'); return; }
+            const { error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) setAuthMessage('Não foi possível ativar a conta: ' + error.message);
+            else setAuthMessage('Conta inicial criada. Confirme o e-mail, se solicitado, e entre com essa conta para ativar o perfil de administrador principal.', false);
         });
         supabaseClient.auth.onAuthStateChange((_event, session) => { setTimeout(() => activateSession(session), 0); });
         window.onload = async function() {
@@ -1164,7 +1222,7 @@
         // Excluir Vistoria
         async function deleteInspection(id) {
             if (confirm('Tem certeza que deseja excluir este registro de vistoria?')) {
-                const { error } = await supabaseClient.from('inspections').delete().eq('id', id).eq('user_id', activeUser.id);
+                const { error } = await supabaseClient.from('inspections').delete().eq('id', id);
                 if (error) { alert('Erro ao excluir do Supabase: ' + error.message); return; }
                 inspections = inspections.filter(i => i.id !== id);
                 renderInspectionList(); updateDashboard();
