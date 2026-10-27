@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Vistoria de Locais de Prova - SES/TO</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        health: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            .page-break { page-break-before: always; }
+            body { background: white; color: black; font-size: 11pt; }
+            .shadow-xl, .shadow-md, .shadow-sm { box-shadow: none !important; }
+            .border { border-color: #cbd5e1 !important; }
+            input, select, textarea { border: none !important; background: transparent !important; }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased">
+    <section id="auth-gate" class="min-h-screen flex items-center justify-center p-6 bg-slate-900">
+      <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-5">
+        <div class="text-center"><div class="inline-flex items-center justify-center h-14 w-14 rounded-xl bg-sky-700 text-white text-2xl mb-3"><i class="fa-solid fa-clipboard-check"></i></div>
+          <h1 class="text-xl font-bold text-slate-900">Sistema de Vistoria SES/TO</h1><p class="text-sm text-slate-500 mt-1">Entre para acessar as vistorias salvas na nuvem.</p></div>
+        <form id="auth-form" class="space-y-4">
+          <div><label for="auth-email" class="block text-sm font-medium mb-1">E-mail</label><input id="auth-email" type="email" required autocomplete="username" class="w-full border border-slate-300 rounded-lg p-3" placeholder="seu@email.com"></div>
+          <div><label for="auth-password" class="block text-sm font-medium mb-1">Senha</label><input id="auth-password" type="password" required minlength="6" autocomplete="current-password" class="w-full border border-slate-300 rounded-lg p-3" placeholder="Sua senha"></div>
+          <button id="auth-submit" class="w-full bg-sky-700 hover:bg-sky-800 text-white rounded-lg p-3 font-semibold" type="submit">Entrar</button>
+          <button id="auth-signup" class="w-full border border-slate-300 hover:bg-slate-50 rounded-lg p-3 font-semibold" type="button">Criar conta</button>
+          <p id="auth-message" class="text-sm text-center text-rose-600" role="status"></p>
+        </form>
+        <p class="text-xs text-slate-400 text-center">Seus registros são protegidos por autenticação e políticas de acesso do Supabase.</p>
+      </div>
+    </section>
+    <div id="app-root" class="hidden flex flex-col min-h-screen">
+
+
+    <!-- Header Principal -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logotipo e Título -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-brand-600 p-2 rounded-lg text-white font-bold text-xl flex items-center justify-center h-10 w-10">
+                        <i class="fa-solid fa-clipboard-check"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-base sm:text-lg leading-tight">Sistema de Vistoria de Locais de Prova</h1>
+                        <p class="text-xs text-slate-400 hidden sm:block">Concurso Público da Saúde | Edital nº 001/2026 – SECAD/SES/TO</p>
+                    </div>
+                </div>
+
+                <!-- Navigation Tabs -->
+                <nav class="flex space-x-1 sm:space-x-2">
+                    <button id="tab-dashboard-btn" onclick="switchTab('dashboard')" class="px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 bg-brand-600 text-white">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span class="hidden md:inline">Dashboard</span>
+                    </button>
+                    <button id="tab-form-btn" onclick="switchTab('form')" class="px-3 py-2 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors flex items-center space-x-2">
+                        <i class="fa-solid fa-file-pen"></i>
+                        <span class="hidden md:inline">Nova Vistoria</span>
+                    </button>
+                    <button id="tab-list-btn" onclick="switchTab('list')" class="px-3 py-2 rounded-md text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors flex items-center space-x-2">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span class="hidden md:inline">Vistorias Registradas</span>
+                    </button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sub-header informativo -->
+    <div class="bg-slate-800 text-slate-300 text-xs py-1.5 px-4 no-print border-b border-slate-700">
+        <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-2">
+            <span>Contrato nº 001043/2026 | Processo nº 2025/23000/003109</span>
+            <div class="flex space-x-4">
+                <button onclick="loadMockData()" class="text-brand-400 hover:underline flex items-center space-x-1">
+                    <i class="fa-solid fa-database"></i> <span>Carregar Dados Demonstrativos</span>
+                </button>
+                <button onclick="resetData()" class="text-rose-400 hover:underline flex items-center space-x-1">
+                    <i class="fa-solid fa-trash-can"></i> <span>Limpar Dados</span>
+                </button>
+                <button onclick="signOut()" class="text-slate-300 hover:underline flex items-center space-x-1"><i class="fa-solid fa-right-from-bracket"></i><span>Sair</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ================= ABAS: DASHBOARD ================= -->
+        <section id="section-dashboard" class="space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">Visão Geral & Indicadores de Vistoria</h2>
+                    <p class="text-slate-500 text-sm">Acompanhamento em tempo real das condições técnicas dos locais de prova cadastrados.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="switchTab('form')" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 shadow-sm">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Nova Vistoria</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cards de Métricas Principais -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500 uppercase">Total de Vistorias</span>
+                        <div class="p-2 bg-slate-100 rounded-lg text-slate-600"><i class="fa-solid fa-building flex"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <span id="dash-stat-total" class="text-3xl font-bold text-slate-800">0</span>
+                        <p class="text-xs text-slate-500 mt-1">Locais auditados</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500 flex flex-col justify-between">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-emerald-700 uppercase">Favoráveis</span>
+                        <div class="p-2 bg-emerald-50 rounded-lg text-emerald-600"><i class="fa-solid fa-circle-check"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <span id="dash-stat-fav" class="text-3xl font-bold text-emerald-600">0</span>
+                        <p class="text-xs text-slate-500 mt-1">Aprovados integralmente</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-amber-500 flex flex-col justify-between">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-amber-700 uppercase">Condicionados</span>
+                        <div class="p-2 bg-amber-50 rounded-lg text-amber-600"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <span id="dash-stat-cond" class="text-3xl font-bold text-amber-600">0</span>
+                        <p class="text-xs text-slate-500 mt-1">Ajustes necessários</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-rose-500 flex flex-col justify-between">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-rose-700 uppercase">Não Favoráveis</span>
+                        <div class="p-2 bg-rose-50 rounded-lg text-rose-600"><i class="fa-solid fa-circle-xmark"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <span id="dash-stat-nfav" class="text-3xl font-bold text-rose-600">0</span>
+                        <p class="text-xs text-slate-500 mt-1">Reprovados / Críticos</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold text-slate-500 uppercase">Média Barema</span>
+                        <div class="p-2 bg-brand-50 rounded-lg text-brand-600"><i class="fa-solid fa-chart-line"></i></div>
+                    </div>
+                    <div class="mt-4">
+                        <span id="dash-stat-avg" class="text-3xl font-bold text-brand-600">0%</span>
+                        <p class="text-xs text-slate-500 mt-1">Aproveitamento médio</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Gráfico de Rosca: Status Parecer -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-pie text-brand-600"></i>
+                        <span>Distribuição de Pareceres Conclusivos</span>
+                    </h3>
+                    <div class="relative flex-grow min-h-[250px] flex items-center justify-center">
+                        <canvas id="chart-parecer"></canvas>
+                    </div>
+                </div>
+
+                <!-- Gráfico de Coluna: Média por Categoria -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-bar text-brand-600"></i>
+                        <span>Conformidade Média por Categoria (%)</span>
+                    </h3>
+                    <div class="relative flex-grow min-h-[250px]">
+                        <canvas id="chart-categories"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela Resumo Recente -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+                    <h3 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                        <i class="fa-solid fa-clock-rotate-left text-brand-600"></i>
+                        <span>Últimas Vistorias Realizadas</span>
+                    </h3>
+                    <button onclick="switchTab('list')" class="text-xs font-semibold text-brand-600 hover:underline">Ver todas</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
+                            <tr>
+                                <th class="p-4">Local / Unidade</th>
+                                <th class="p-4">Município</th>
+                                <th class="p-4 text-center">Pontos Obtidos</th>
+                                <th class="p-4 text-center">Índice Barema</th>
+                                <th class="p-4 text-center">Itens Críticos NC</th>
+                                <th class="p-4 text-center">Parecer Sugerido</th>
+                                <th class="p-4 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dash-table-body" class="divide-y divide-slate-100">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ================= ABAS: FORMULÁRIO DE VISTORIA ================= -->
+        <section id="section-form" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">Ficha de Vistoria Prévia de Local de Prova</h2>
+                    <p class="text-slate-500 text-sm">Checklist e Barema técnico para avaliação operacional dos locais.</p>
+                </div>
+                <div class="flex gap-2 no-print">
+                    <button type="button" onclick="resetForm()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1">
+                        <i class="fa-solid fa-rotate-left"></i> <span>Limpar Form</span>
+                    </button>
+                    <button type="button" onclick="saveInspection()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1 shadow-sm">
+                        <i class="fa-solid fa-floppy-disk"></i> <span>Salvar Vistoria</span>
+                    </button>
+                    <button type="button" onclick="window.print()" class="bg-brand-600 hover:bg-brand-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1 shadow-sm">
+                        <i class="fa-solid fa-print"></i> <span>Imprimir / PDF</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- FORMULÁRIO PRINCIPAL -->
+            <form id="inspection-form" class="space-y-6">
+                <!-- Bloco Header Impressão -->
+                <div class="hidden print-only text-center mb-6 border-b pb-4">
+                    <h1 class="text-xl font-bold">COMISSÃO ORGANIZADORA DO CONCURSO PÚBLICO DA SAÚDE</h1>
+                    <h2 class="text-base font-semibold">FICHA DE VISTORIA PRÉVIA DOS LOCAIS DE PROVA - CHECKLIST E BAREMA</h2>
+                    <p class="text-xs">Edital nº 001/2026 – SECAD/SES/TO | Contrato nº 001043/2026 | Processo nº 2025/23000/003109</p>
+                </div>
+
+                <!-- 1. IDENTIFICAÇÃO DO LOCAL -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <h3 class="text-base font-bold text-brand-700 border-b border-slate-100 pb-2 flex items-center space-x-2">
+                        <i class="fa-solid fa-hospital-user"></i>
+                        <span>1. Identificação do Local e Responsáveis</span>
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Unidade / Local de Prova *</label>
+                            <input type="text" id="info-unidade" required placeholder="Ex: Colégio Estadual Professor Doutor..." class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Município *</label>
+                            <input type="text" id="info-municipio" required placeholder="Ex: Palmas" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Endereço Completo</label>
+                            <input type="text" id="info-endereco" placeholder="Rua, Número, Bairro, CEP" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Data da Vistoria</label>
+                            <input type="date" id="info-data" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Turno(s)</label>
+                            <select id="info-turno" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <option value="Matutino">Matutino</option>
+                                <option value="Vesperino">Vesperino</option>
+                                <option value="Ambos (Matutino/Vesperino)">Ambos (Matutino/Vesperino)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Horário Início</label>
+                            <input type="time" id="info-horario-inicio" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Horário Término</label>
+                            <input type="time" id="info-horario-termino" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Responsável pelo Local</label>
+                            <input type="text" id="info-responsavel-local" placeholder="Nome do Diretor/Gestor" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Contato do Responsável</label>
+                            <input type="text" id="info-contato-local" placeholder="(63) 9.... / E-mail" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 pt-2 border-t border-slate-100">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Vistoriador SES/TO *</label>
+                            <input type="text" id="info-vistoriador" required placeholder="Nome completo do auditor" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Salas Previstas</label>
+                            <input type="number" id="info-salas-previstas" min="0" value="0" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Capac. Informada</label>
+                            <input type="number" id="info-cap-informada" min="0" value="0" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Capac. Verificada</label>
+                            <input type="number" id="info-cap-verificada" min="0" value="0" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PAINEL DE PONTUAÇÃO DINÂMICA DO BAREMA -->
+                <div class="sticky top-16 z-40 bg-slate-900 text-white p-4 rounded-xl shadow-xl flex flex-wrap items-center justify-between gap-4 border border-slate-700">
+                    <div class="flex items-center space-x-6">
+                        <div>
+                            <span class="text-xs text-slate-400 block uppercase font-medium">Pontos Obtidos</span>
+                            <span id="score-obtained" class="text-2xl font-bold text-emerald-400">0</span>
+                        </div>
+                        <div class="border-l border-slate-700 pl-6">
+                            <span class="text-xs text-slate-400 block uppercase font-medium">Pontos Aplicáveis</span>
+                            <span id="score-applicable" class="text-2xl font-bold text-slate-200">100</span>
+                        </div>
+                        <div class="border-l border-slate-700 pl-6">
+                            <span class="text-xs text-slate-400 block uppercase font-medium">Índice Barema</span>
+                            <span id="score-percentage" class="text-2xl font-bold text-brand-400">0%</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4">
+                        <div class="text-right">
+                            <span class="text-xs text-slate-400 block uppercase font-medium">Recomendação do Sistema</span>
+                            <span id="score-recommendation" class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                Aguardando preenchimento
+                            </span>
+                        </div>
+                        <div id="critical-alert" class="hidden bg-rose-500/20 text-rose-300 text-xs p-2 rounded-lg border border-rose-500/40 flex items-center space-x-1">
+                            <i class="fa-solid fa-triangle-exclamation text-rose-400 text-base"></i>
+                            <span>Item Crítico NC presente!</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. CHECKLIST E BAREMA DE AVALIAÇÃO (A a E) -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-8">
+                    <div>
+                        <h3 class="text-base font-bold text-slate-900 mb-1">2. Checklist e Barema Técnico com Atribuição de Nota</h3>
+                        <p class="text-xs text-slate-500 mb-4">Marque a situação: <strong>C (Conforme)</strong>, <strong>NC (Não Conforme)</strong> ou <strong>NA (Não Aplicável)</strong> e defina a <strong>Nota Atribuída</strong> (de 0 até a Nota Máxima). Os itens marcados com <span class="text-amber-500 font-bold">★</span> são CRÍTICOS e impedem aprovação se marcados como NC.</p>
+                    </div>
+
+                    <!-- GRUPO A -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center bg-slate-100 p-3 rounded-lg border border-slate-200">
+                            <h4 class="font-bold text-slate-800 text-sm">A. ÁGUA, SANITÁRIOS E HIGIENE (Máximo: 28 pontos)</h4>
+                            <span class="text-xs font-semibold bg-brand-100 text-brand-800 px-2.5 py-1 rounded-full" id="cat-score-A">0 / 28 pts</span>
+                        </div>
+                        <div id="checklist-A" class="space-y-2"></div>
+                    </div>
+
+                    <!-- GRUPO B -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center bg-slate-100 p-3 rounded-lg border border-slate-200">
+                            <h4 class="font-bold text-slate-800 text-sm">B. SALAS, VENTILAÇÃO E CONFORTO (Máximo: 25 pontos)</h4>
+                            <span class="text-xs font-semibold bg-brand-100 text-brand-800 px-2.5 py-1 rounded-full" id="cat-score-B">0 / 25 pts</span>
+                        </div>
+                        <div id="checklist-B" class="space-y-2"></div>
+                    </div>
+
+                    <!-- GRUPO C -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center bg-slate-100 p-3 rounded-lg border border-slate-200">
+                            <h4 class="font-bold text-slate-800 text-sm">C. ACESSIBILIDADE E ATENDIMENTO ESPECIAL (Máximo: 15 pontos)</h4>
+                            <span class="text-xs font-semibold bg-brand-100 text-brand-800 px-2.5 py-1 rounded-full" id="cat-score-C">0 / 15 pts</span>
+                        </div>
+                        <div id="checklist-C" class="space-y-2"></div>
+                    </div>
+
+                    <!-- GRUPO D -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center bg-slate-100 p-3 rounded-lg border border-slate-200">
+                            <h4 class="font-bold text-slate-800 text-sm">D. SEGURANÇA E EMERGÊNCIAS (Máximo: 20 pontos)</h4>
+                            <span class="text-xs font-semibold bg-brand-100 text-brand-800 px-2.5 py-1 rounded-full" id="cat-score-D">0 / 20 pts</span>
+                        </div>
+                        <div id="checklist-D" class="space-y-2"></div>
+                    </div>
+
+                    <!-- GRUPO E -->
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center bg-slate-100 p-3 rounded-lg border border-slate-200">
+                            <h4 class="font-bold text-slate-800 text-sm">E. LOGÍSTICA E ORGANIZAÇÃO (Máximo: 12 pontos)</h4>
+                            <span class="text-xs font-semibold bg-brand-100 text-brand-800 px-2.5 py-1 rounded-full" id="cat-score-E">0 / 12 pts</span>
+                        </div>
+                        <div id="checklist-E" class="space-y-2"></div>
+                    </div>
+                </div>
+
+                <!-- 3. CAPACIDADE DE CARGA E DISTRIBUIÇÃO -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">F. Capacidade de Carga e Ambientes</h3>
+                            <p class="text-xs text-slate-500">Quantificar blocos, salas e distribuição para comparação com parâmetros da FGV.</p>
+                        </div>
+                        <button type="button" onclick="addCapacityRow()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1 no-print">
+                            <i class="fa-solid fa-plus"></i> <span>Adicionar Bloco</span>
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 text-xs uppercase font-semibold">
+                                    <th class="p-3 border border-slate-200">Bloco / Pavimento</th>
+                                    <th class="p-3 border border-slate-200 w-28 text-center">Nº Salas</th>
+                                    <th class="p-3 border border-slate-200 w-32 text-center">Capacidade Total</th>
+                                    <th class="p-3 border border-slate-200 w-32 text-center">% Térreo</th>
+                                    <th class="p-3 border border-slate-200 w-32 text-center">% Superior</th>
+                                    <th class="p-3 border border-slate-200 w-16 text-center no-print">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="capacity-table-body">
+                                <!-- Linhas dinâmicas -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 4. NÃO CONFORMIDADES E PROVIDÊNCIAS -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900">Não Conformidades e Providências Necessárias</h3>
+                            <p class="text-xs text-slate-500">Registro detalhado dos achados, evidências e prazos de saneamento.</p>
+                        </div>
+                        <button type="button" onclick="addNcRow()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1.5 rounded-lg font-medium transition flex items-center space-x-1 no-print">
+                            <i class="fa-solid fa-plus"></i> <span>Adicionar Achado</span>
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 text-xs uppercase font-semibold">
+                                    <th class="p-3 border border-slate-200 w-1/4">Item / Ambiente</th>
+                                    <th class="p-3 border border-slate-200 w-1/3">Achado e Evidência (Foto nº)</th>
+                                    <th class="p-3 border border-slate-200">Medida Corretiva / Responsável</th>
+                                    <th class="p-3 border border-slate-200 w-32 text-center">Prazo / Rechecagem</th>
+                                    <th class="p-3 border border-slate-200 w-16 text-center no-print">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="nc-table-body">
+                                <!-- Linhas dinâmicas de NC -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 5. PARECER CONCLUSIVO E FINALIZAÇÃO -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                    <h3 class="text-base font-bold text-brand-700 border-b border-slate-100 pb-2 flex items-center space-x-2">
+                        <i class="fa-solid fa-file-contract"></i>
+                        <span>Parecer Conclusivo da Vistoria</span>
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <label class="border-2 border-slate-200 p-4 rounded-xl flex items-center space-x-3 cursor-pointer hover:border-emerald-500 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/50">
+                            <input type="radio" name="parecer-final" value="FAVORÁVEL" class="w-4 h-4 text-emerald-600 focus:ring-emerald-500">
+                            <div>
+                                <span class="block font-bold text-emerald-700 text-sm">FAVORÁVEL</span>
+                                <span class="text-xs text-slate-500">≥ 90% e nenhum item crítico NC</span>
+                            </div>
+                        </label>
+
+                        <label class="border-2 border-slate-200 p-4 rounded-xl flex items-center space-x-3 cursor-pointer hover:border-amber-500 transition has-[:checked]:border-amber-500 has-[:checked]:bg-amber-50/50">
+                            <input type="radio" name="parecer-final" value="FAVORÁVEL CONDICIONADO" class="w-4 h-4 text-amber-600 focus:ring-amber-500">
+                            <div>
+                                <span class="block font-bold text-amber-700 text-sm">FAVORÁVEL CONDICIONADO</span>
+                                <span class="text-xs text-slate-500">75% – 89,9% e nenhum item crítico NC</span>
+                            </div>
+                        </label>
+
+                        <label class="border-2 border-slate-200 p-4 rounded-xl flex items-center space-x-3 cursor-pointer hover:border-rose-500 transition has-[:checked]:border-rose-500 has-[:checked]:bg-rose-50/50">
+                            <input type="radio" name="parecer-final" value="NÃO FAVORÁVEL" class="w-4 h-4 text-rose-600 focus:ring-rose-500">
+                            <div>
+                                <span class="block font-bold text-rose-700 text-sm">NÃO FAVORÁVEL</span>
+                                <span class="text-xs text-slate-500">&lt; 75% OU qualquer crítico NC</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fundamentação Técnica e Condicionantes</label>
+                        <textarea id="parecer-fundamentacao" rows="3" placeholder="Descreva os motivos da decisão, restrições operacionais ou exigências para adequação..." class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Revistoria Necessária?</label>
+                            <select id="parecer-revistoria" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <option value="Não">Não</option>
+                                <option value="Sim">Sim</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Data Limite Rechecagem</label>
+                            <input type="date" id="parecer-data-limite" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Comunicado à FGV em</label>
+                            <input type="date" id="parecer-data-fgv" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Matrícula do Vistoriador</label>
+                            <input type="text" id="info-matricula" placeholder="Ex: 123456-7" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Observações Adicionais e Ambientes Não Vistoriados</label>
+                        <textarea id="parecer-obs" rows="2" placeholder="Ex: Blocos C e D em reforma, não vistoriados. Fotos anexa de nº 01 a 15." class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-6 mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 text-center text-xs text-slate-600">
+                        <div class="space-y-8">
+                            <div class="border-b border-slate-400 w-3/4 mx-auto"></div>
+                            <p><strong>Vistoriador(a) SES/TO</strong><br>Assinatura e carimbo</p>
+                        </div>
+                        <div class="space-y-8">
+                            <div class="border-b border-slate-400 w-3/4 mx-auto"></div>
+                            <p><strong>Ciência do Responsável Local / FGV</strong><br>Assinatura e CPF</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação no Rodapé do Form -->
+                <div class="flex justify-end space-x-3 no-print pt-4">
+                    <button type="button" onclick="resetForm()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-2.5 rounded-lg text-sm font-medium transition">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="saveInspection()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg text-sm font-semibold transition shadow-md flex items-center space-x-2">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Salvar Vistoria</span>
+                    </button>
+                </div>
+            </form>
+        </section>
+
+
+        <!-- ================= ABAS: LISTA DE VISTORIAS ================= -->
+        <section id="section-list" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">Vistorias Cadastradas</h2>
+                    <p class="text-slate-500 text-sm">Gerencie, filtre, edite ou exporte os relatórios de vistoria dos locais.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="exportDataJSON()" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1">
+                        <i class="fa-solid fa-download"></i> <span>Exportar JSON</span>
+                    </button>
+                    <button onclick="exportDataCSV()" class="bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-1">
+                        <i class="fa-solid fa-file-csv"></i> <span>Exportar CSV</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtros de Busca -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4">
+                <div class="flex-grow">
+                    <input type="text" id="filter-search" oninput="renderInspectionList()" placeholder="Buscar por unidade, município ou vistoriador..." class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+                <div class="w-full md:w-48">
+                    <select id="filter-parecer" onchange="renderInspectionList()" class="w-full text-sm border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                        <option value="">Todos os Pareceres</option>
+                        <option value="FAVORÁVEL">Favorável</option>
+                        <option value="FAVORÁVEL CONDICIONADO">Favorável Condicionado</option>
+                        <option value="NÃO FAVORÁVEL">Não Favorável</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabela Principal -->
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-100 text-xs uppercase font-semibold text-slate-700">
+                            <tr>
+                                <th class="p-4">Data</th>
+                                <th class="p-4">Unidade / Local</th>
+                                <th class="p-4">Município</th>
+                                <th class="p-4">Vistoriador</th>
+                                <th class="p-4 text-center">Pontos Obtidos</th>
+                                <th class="p-4 text-center">Índice Barema</th>
+                                <th class="p-4 text-center">Parecer Final</th>
+                                <th class="p-4 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="list-table-body" class="divide-y divide-slate-100">
+                            <!-- Inserido dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 mt-8 text-center text-xs text-slate-500 no-print">
+        <p>Secretaria de Estado da Saúde de Tocantins (SES/TO) & SECAD/TO – Vistoria de Locais de Prova 2026</p>
+    </footer>
+
+
+    <!-- Supabase client (publishable key; RLS protects database rows) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- ================= JAVASCRIPT ================= -->
+    <script>
+        // Estrutura do Barema de Vistoria
+        const BAREMA_ITEMS = [
+            // A. ÁGUA, SANITÁRIOS E HIGIENE (28 pts)
+            { id: 'a1', cat: 'A', text: 'Abastecimento contínuo de água em condições de uso', max: 7, critical: true },
+            { id: 'a2', cat: 'A', text: 'Água potável acessível; bebedouros/filtros funcionando e higienizados', max: 7, critical: true },
+            { id: 'a3', cat: 'A', text: 'Banheiros suficientes, funcionais e com descarga', max: 7, critical: true },
+            { id: 'a4', cat: 'A', text: 'Ausência de esgoto exposto, infiltrações, odores insalubres e poluição sonora', max: 7, critical: true },
+
+            // B. SALAS, VENTILAÇÃO E CONFORTO (25 pts)
+            { id: 'b1', cat: 'B', text: 'Fornecimento de energia elétrica e funcionamento adequado do sistema elétrico predial', max: 5, critical: true },
+            { id: 'b2', cat: 'B', text: 'Ventilação de ar natural com a renovação do ar e conforto térmico adequado', max: 5, critical: true },
+            { id: 'b3', cat: 'B', text: 'Ventiladores ou ar-condicionado presentes, operantes e adequados ao ambiente', max: 5, critical: true },
+            { id: 'b4', cat: 'B', text: 'Carteiras/mesas e assentos íntegros, estáveis e em número suficiente', max: 5, critical: true },
+            { id: 'b5', cat: 'B', text: 'Espaçamento, circulação e distribuição das carteiras compatíveis com a prova', max: 5, critical: false },
+
+            // C. ACESSIBILIDADE E ATENDIMENTO ESPECIAL (15 pts)
+            { id: 'c1', cat: 'C', text: 'Rota acessível da entrada até salas, banheiros e bebedouros (rampas/elevadores seguros)', max: 5, critical: true },
+            { id: 'c2', cat: 'C', text: 'Banheiro acessível em plenas condições de uso', max: 5, critical: true },
+            { id: 'c3', cat: 'C', text: 'Sinalização e orientação acessíveis', max: 5, critical: false },
+
+            // D. SEGURANÇA E EMERGÊNCIAS (20 pts)
+            { id: 'd1', cat: 'D', text: 'Saídas de emergência desobstruídas e rotas de fuga identificadas', max: 4, critical: true },
+            { id: 'd2', cat: 'D', text: 'Extintores e demais recursos de prevenção a incêndio disponíveis e adequados', max: 4, critical: true },
+            { id: 'd3', cat: 'D', text: 'Instalações elétricas íntegras, sem fiação exposta ou riscos evidentes', max: 4, critical: true },
+            { id: 'd4', cat: 'D', text: 'Acesso seguro, escadas/corrimãos/pisos sem riscos de queda', max: 4, critical: true },
+            { id: 'd5', cat: 'D', text: 'Espaço para controle de acesso e utilização de detectores de metal', max: 4, critical: false },
+
+            // E. LOGÍSTICA E ORGANIZAÇÃO (12 pts)
+            { id: 'e1', cat: 'E', text: 'Condições adequadas para identificação do local (logradouro, fachada, blocos, salas)', max: 4, critical: false },
+            { id: 'e2', cat: 'E', text: 'Área para equipe de aplicação, guarda controlada e apoio operacional', max: 4, critical: false },
+            { id: 'e3', cat: 'E', text: 'Acesso, chegada e fluxo de candidatos viáveis, inclusive em chuva', max: 4, critical: false }
+        ];
+
+        // Estado do Formulário / Aplicação
+        let currentInspectionId = null;
+        let inspections = [];
+        let chartParecer = null;
+        let chartCategories = null;
+
+        // Configure com a URL e a chave publicável do projeto Supabase.
+        const SUPABASE_URL = 'https://ulvcnewfldxqktqgkhmy.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_KyFPavUchZsOzwIEhYRr9A_5WGXUzeX';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+        let activeUser = null;
+
+        function setAuthMessage(message, isError = true) {
+            const el = document.getElementById('auth-message');
+            el.textContent = message || '';
+            el.className = 'text-sm text-center ' + (isError ? 'text-rose-600' : 'text-emerald-700');
+        }
+        async function signOut() {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) alert('Não foi possível sair: ' + error.message);
+        }
+        async function loadCloudInspections() {
+            if (!activeUser) return;
+            const { data, error } = await supabaseClient.from('inspections').select('id, inspection_data, updated_at').order('updated_at', { ascending: false });
+            if (error) { alert('Erro ao carregar vistorias do Supabase: ' + error.message); return; }
+            inspections = (data || []).map(row => ({ ...row.inspection_data, id: row.id, updatedAt: row.updated_at || row.inspection_data.updatedAt }));
+            updateDashboard();
+            renderInspectionList();
+        }
+        async function activateSession(session) {
+            activeUser = session?.user || null;
+            document.getElementById('auth-gate').classList.toggle('hidden', !!activeUser);
+            document.getElementById('app-root').classList.toggle('hidden', !activeUser);
+            if (activeUser) {
+                renderChecklist();
+                document.getElementById('capacity-table-body').innerHTML = '';
+                document.getElementById('nc-table-body').innerHTML = '';
+                addCapacityRow(); addNcRow();
+                await loadCloudInspections();
+            } else {
+                inspections = [];
+            }
+        }
+        document.getElementById('auth-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const button = document.getElementById('auth-submit'); button.disabled = true; button.textContent = 'Entrando...';
+            setAuthMessage('');
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+            const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+            if (error) setAuthMessage('Não foi possível entrar: ' + error.message);
+            button.disabled = false; button.textContent = 'Entrar';
+        });
+        document.getElementById('auth-signup').addEventListener('click', async () => {
+            setAuthMessage('');
+            const email = document.getElementById('auth-email').value.trim();
+            const password = document.getElementById('auth-password').value;
+            if (!email || password.length < 6) { setAuthMessage('Informe um e-mail e uma senha com pelo menos 6 caracteres.'); return; }
+            const { data, error } = await supabaseClient.auth.signUp({ email, password });
+            if (error) setAuthMessage('Não foi possível criar a conta: ' + error.message);
+            else if (data.session) setAuthMessage('Conta criada e acesso liberado.', false);
+            else setAuthMessage('Conta criada. Confira seu e-mail para confirmar o cadastro antes de entrar.', false);
+        });
+        supabaseClient.auth.onAuthStateChange((_event, session) => { setTimeout(() => activateSession(session), 0); });
+        window.onload = async function() {
+            renderChecklist();
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            await activateSession(session);
+        };
+
+        // Navegação entre Abas
+        function switchTab(tabName) {
+            ['dashboard', 'form', 'list'].forEach(tab => {
+                document.getElementById(`section-${tab}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-${tab}-btn`);
+                btn.classList.remove('bg-brand-600', 'text-white');
+                btn.classList.add('text-slate-300');
+            });
+
+            document.getElementById(`section-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabName}-btn`);
+            activeBtn.classList.add('bg-brand-600', 'text-white');
+            activeBtn.classList.remove('text-slate-300');
+
+            if (tabName === 'dashboard') {
+                updateDashboard();
+            } else if (tabName === 'list') {
+                renderInspectionList();
+            }
+        }
+
+        // Renderizar a Lista de Critérios no Formulário permitindo escolha de C/NC/NA e entrada de Nota
+        function renderChecklist() {
+            const categories = ['A', 'B', 'C', 'D', 'E'];
+            categories.forEach(cat => {
+                const container = document.getElementById(`checklist-${cat}`);
+                container.innerHTML = '';
+                const items = BAREMA_ITEMS.filter(item => item.cat === cat);
+
+                items.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'flex flex-col md:flex-row md:items-center justify-between p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 gap-3 transition bg-white';
+                    
+                    const star = item.critical ? '<span class="text-amber-500 font-bold mr-1" title="Item Crítico">★</span>' : '';
+
+                    row.innerHTML = `
+                        <div class="flex-grow pr-2">
+                            <span class="text-xs font-semibold text-slate-400 mr-2">[Máx: ${item.max} pts]</span>
+                            <span class="text-sm text-slate-800 font-medium">${star}${item.text}</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-3 shrink-0">
+                            <!-- Radios de Opção -->
+                            <div class="flex items-center space-x-1">
+                                <label class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-emerald-100 border border-slate-200 cursor-pointer text-xs font-bold transition flex items-center space-x-1">
+                                    <input type="radio" name="item-status-${item.id}" value="C" checked onchange="handleStatusChange('${item.id}', ${item.max})" class="text-emerald-600 focus:ring-emerald-500">
+                                    <span class="text-emerald-700">C</span>
+                                </label>
+                                <label class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-rose-100 border border-slate-200 cursor-pointer text-xs font-bold transition flex items-center space-x-1">
+                                    <input type="radio" name="item-status-${item.id}" value="NC" onchange="handleStatusChange('${item.id}', ${item.max})" class="text-rose-600 focus:ring-rose-500">
+                                    <span class="text-rose-700">NC</span>
+                                </label>
+                                <label class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-amber-100 border border-slate-200 cursor-pointer text-xs font-bold transition flex items-center space-x-1">
+                                    <input type="radio" name="item-status-${item.id}" value="NA" onchange="handleStatusChange('${item.id}', ${item.max})" class="text-amber-600 focus:ring-amber-500">
+                                    <span class="text-amber-700">NA</span>
+                                </label>
+                            </div>
+
+                            <!-- Campo de Nota Numérica Atribuída -->
+                            <div class="flex items-center space-x-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                                <span class="text-xs font-semibold text-slate-500">Nota:</span>
+                                <input type="number" id="item-score-${item.id}" min="0" max="${item.max}" step="0.5" value="${item.max}" oninput="validateAndCalculate('${item.id}', ${item.max})" class="w-16 text-center text-xs font-bold border border-slate-300 rounded p-1 bg-white focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                                <span class="text-xs text-slate-400 font-medium">/ ${item.max}</span>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            });
+            calculateScore();
+        }
+
+        // Alteração do Status (C, NC, NA) ajusta nota padrão e recalculando o Barema
+        function handleStatusChange(itemId, maxVal) {
+            const status = document.querySelector(`input[name="item-status-${itemId}"]:checked`)?.value;
+            const scoreInput = document.getElementById(`item-score-${itemId}`);
+
+            if (status === 'C') {
+                scoreInput.value = maxVal;
+                scoreInput.disabled = false;
+            } else if (status === 'NC') {
+                scoreInput.value = 0;
+                scoreInput.disabled = false;
+            } else if (status === 'NA') {
+                scoreInput.value = 0;
+                scoreInput.disabled = true;
+            }
+            calculateScore();
+        }
+
+        // Validação da nota manual e recálculo
+        function validateAndCalculate(itemId, maxVal) {
+            const scoreInput = document.getElementById(`item-score-${itemId}`);
+            let val = parseFloat(scoreInput.value) || 0;
+            
+            if (val < 0) val = 0;
+            if (val > maxVal) val = maxVal;
+            scoreInput.value = val;
+
+            calculateScore();
+        }
+
+        // Cálculo Automático de Pontuação do Barema considerando Notas Individuais
+        function calculateScore() {
+            let obtained = 0;
+            let applicableMax = 100;
+            let hasCriticalNC = false;
+
+            const catScores = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+            const catMaxes = { A: 28, B: 25, C: 15, D: 20, E: 12 };
+
+            BAREMA_ITEMS.forEach(item => {
+                const status = document.querySelector(`input[name="item-status-${item.id}"]:checked`)?.value || 'C';
+                const scoreInput = document.getElementById(`item-score-${item.id}`);
+                const itemScore = parseFloat(scoreInput?.value) || 0;
+
+                if (status === 'NA') {
+                    applicableMax -= item.max;
+                    catMaxes[item.cat] -= item.max;
+                } else {
+                    obtained += itemScore;
+                    catScores[item.cat] += itemScore;
+
+                    if (status === 'NC' && item.critical) {
+                        hasCriticalNC = true;
+                    }
+                }
+            });
+
+            const percentage = applicableMax > 0 ? ((obtained / applicableMax) * 100).toFixed(1) : 0;
+
+            // Atualizar contadores na tela
+            document.getElementById('score-obtained').innerText = obtained % 1 === 0 ? obtained : obtained.toFixed(1);
+            document.getElementById('score-applicable').innerText = applicableMax;
+            document.getElementById('score-percentage').innerText = `${percentage}%`;
+
+            // Atualizar tags por categoria
+            ['A', 'B', 'C', 'D', 'E'].forEach(cat => {
+                const catObtainedFormatted = catScores[cat] % 1 === 0 ? catScores[cat] : catScores[cat].toFixed(1);
+                document.getElementById(`cat-score-${cat}`).innerText = `${catObtainedFormatted} / ${catMaxes[cat]} pts`;
+            });
+
+            // Recomendação Sugerida
+            const recElement = document.getElementById('score-recommendation');
+            const criticalAlert = document.getElementById('critical-alert');
+            let recommendedParecer = '';
+
+            if (hasCriticalNC) {
+                criticalAlert.classList.remove('hidden');
+            } else {
+                criticalAlert.classList.add('hidden');
+            }
+
+            if (percentage >= 90 && !hasCriticalNC) {
+                recommendedParecer = 'FAVORÁVEL';
+                recElement.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-500 text-white';
+            } else if (percentage >= 75 && !hasCriticalNC) {
+                recommendedParecer = 'FAVORÁVEL CONDICIONADO';
+                recElement.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-500 text-white';
+            } else {
+                recommendedParecer = 'NÃO FAVORÁVEL';
+                recElement.className = 'inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-600 text-white';
+            }
+
+            recElement.innerText = `Sugerido: ${recommendedParecer}`;
+
+            // Selecionar o radio button do parecer se não tiver sido alterado manualmente
+            const radioToSelect = document.querySelector(`input[name="parecer-final"][value="${recommendedParecer}"]`);
+            if (radioToSelect) {
+                radioToSelect.checked = true;
+            }
+
+            return { obtained, applicableMax, percentage: parseFloat(percentage), hasCriticalNC, recommendedParecer, catScores };
+        }
+
+        // Tabela F: Capacidade de Carga
+        function addCapacityRow(data = {}) {
+            const tbody = document.getElementById('capacity-table-body');
+            const row = document.createElement('tr');
+            row.className = 'border-b border-slate-100 hover:bg-slate-50';
+            row.innerHTML = `
+                <td class="p-2 border border-slate-200">
+                    <input type="text" class="cap-bloco w-full text-xs p-1.5 border border-slate-300 rounded" placeholder="Ex: Bloco A - Térreo" value="${data.bloco || ''}">
+                </td>
+                <td class="p-2 border border-slate-200">
+                    <input type="number" class="cap-salas w-full text-xs p-1.5 border border-slate-300 rounded text-center" value="${data.salas || 0}">
+                </td>
+                <td class="p-2 border border-slate-200">
+                    <input type="number" class="cap-qtd w-full text-xs p-1.5 border border-slate-300 rounded text-center" value="${data.capacidade || 0}">
+                </td>
+                <td class="p-2 border border-slate-200">
+                    <input type="number" class="cap-terreo w-full text-xs p-1.5 border border-slate-300 rounded text-center" placeholder="%" value="${data.terreo || 0}">
+                </td>
+                <td class="p-2 border border-slate-200">
+                    <input type="number" class="cap-superior w-full text-xs p-1.5 border border-slate-300 rounded text-center" placeholder="%" value="${data.superior || 0}">
+                </td>
+                <td class="p-2 border border-slate-200 text-center no-print">
+                    <button type="button" onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        }
+
+        // Tabela: Não Conformidades
+        function addNcRow(data = {}) {
+            const tbody = document.getElementById('nc-table-body');
+            const row = document.createElement('tr');
+            row.className = 'border-b border-slate-100 hover:bg-slate-50';
+            row.innerHTML = `
+                <td class="p-2 border border-slate-200">
+                    <input type="text" class="nc-item w-full text-xs p-1.5 border border-slate-300 rounded" placeholder="Ex: Banheiro Masc. Bloco B" value="${data.item || ''}">
+                </td>
+                <td class="p-2 border border-slate-200">
+                    <input type="text" class="nc-achado w-full text-xs p-1.5 border border-slate-300 rounded" placeholder="Ex: Vaso com vazamento (Foto 02)" value="${data.achado || ''}">
+                </td>
+                <td class="p-2 border border-slate-200">
+                    <input type="text" class="nc-medida w-full text-xs p-1.5 border border-slate-300 rounded" placeholder="Ex: Reparo hidráulico / FGV" value="${data.medida || ''}">
+                </td>
+                <td class="p-2 border border-slate-200">
+                    <input type="text" class="nc-prazo w-full text-xs p-1.5 border border-slate-300 rounded text-center" placeholder="Ex: 5 dias" value="${data.prazo || ''}">
+                </td>
+                <td class="p-2 border border-slate-200 text-center no-print">
+                    <button type="button" onclick="this.closest('tr').remove()" class="text-rose-500 hover:text-rose-700 p-1"><i class="fa-solid fa-trash"></i></button>
+                </td>            `;
+            tbody.appendChild(row);
+        }
+
+        // Salvar Vistoria no LocalStorage
+        async function saveInspection() {
+            const unidade = document.getElementById('info-unidade').value.trim();
+            const municipio = document.getElementById('info-municipio').value.trim();
+            const vistoriador = document.getElementById('info-vistoriador').value.trim();
+
+            if (!unidade || !municipio || !vistoriador) {
+                alert('Por favor, preencha os campos obrigatórios: Unidade, Município e Vistoriador.');
+                return;
+            }
+
+            const scoreCalc = calculateScore();
+
+            // Coletar itens do checklist com status e notas
+            const checklistState = {};
+            BAREMA_ITEMS.forEach(item => {
+                const status = document.querySelector(`input[name="item-status-${item.id}"]:checked`)?.value || 'C';
+                const score = parseFloat(document.getElementById(`item-score-${item.id}`)?.value) || 0;
+                checklistState[item.id] = { status, score };
+            });
+
+            // Coletar tabela de capacidade
+            const capacityData = [];
+            document.querySelectorAll('#capacity-table-body tr').forEach(tr => {
+                capacityData.push({
+                    bloco: tr.querySelector('.cap-bloco').value,
+                    salas: tr.querySelector('.cap-salas').value,
+                    capacidade: tr.querySelector('.cap-qtd').value,
+                    terreo: tr.querySelector('.cap-terreo').value,
+                    superior: tr.querySelector('.cap-superior').value
+                });
+            });
+
+            // Coletar tabela de NC
+            const ncData = [];
+            document.querySelectorAll('#nc-table-body tr').forEach(tr => {
+                ncData.push({
+                    item: tr.querySelector('.nc-item').value,
+                    achado: tr.querySelector('.nc-achado').value,
+                    medida: tr.querySelector('.nc-medida').value,
+                    prazo: tr.querySelector('.nc-prazo').value
+                });
+            });
+
+            const parecerFinal = document.querySelector('input[name="parecer-final"]:checked')?.value || scoreCalc.recommendedParecer;
+
+            const record = {
+                id: currentInspectionId || crypto.randomUUID(),
+                unidade,
+                municipio,
+                endereco: document.getElementById('info-endereco').value,
+                data: document.getElementById('info-data').value || new Date().toISOString().split('T')[0],
+                turno: document.getElementById('info-turno').value,
+                horarioInicio: document.getElementById('info-horario-inicio').value,
+                horarioTermino: document.getElementById('info-horario-termino').value,
+                responsavelLocal: document.getElementById('info-responsavel-local').value,
+                contatoLocal: document.getElementById('info-contato-local').value,
+                vistoriador,
+                matricula: document.getElementById('info-matricula').value,
+                salasPrevistas: document.getElementById('info-salas-previstas').value,
+                capInformada: document.getElementById('info-cap-informada').value,
+                capVerificada: document.getElementById('info-cap-verificada').value,
+                
+                score: scoreCalc,
+                checklist: checklistState,
+                capacity: capacityData,
+                nonConformities: ncData,
+
+                parecerFinal,
+                fundamentacao: document.getElementById('parecer-fundamentacao').value,
+                revistoria: document.getElementById('parecer-revistoria').value,
+                dataLimite: document.getElementById('parecer-data-limite').value,
+                dataFgv: document.getElementById('parecer-data-fgv').value,
+                observacoes: document.getElementById('parecer-obs').value,
+                updatedAt: new Date().toISOString()
+            };
+
+            if (!activeUser) { alert('Entre no sistema antes de salvar.'); return; }
+            const { error } = await supabaseClient.from('inspections').upsert({
+                id: record.id,
+                user_id: activeUser.id,
+                inspection_data: record,
+                updated_at: record.updatedAt
+            });
+            if (error) { alert('Erro ao salvar no Supabase: ' + error.message); return; }
+            const index = inspections.findIndex(i => i.id === record.id);
+            if (index >= 0) inspections[index] = record; else inspections.unshift(record);
+            alert('Vistoria salva no Supabase com sucesso!');
+            updateDashboard(); renderInspectionList(); switchTab('list');
+        }
+
+        // Carregar Formulário para Edição
+        function editInspection(id) {
+            const item = inspections.find(i => i.id === id);
+            if (!item) return;
+
+            currentInspectionId = item.id;
+            document.getElementById('info-unidade').value = item.unidade || '';
+            document.getElementById('info-municipio').value = item.municipio || '';
+            document.getElementById('info-endereco').value = item.endereco || '';
+            document.getElementById('info-data').value = item.data || '';
+            document.getElementById('info-turno').value = item.turno || 'Matutino';
+            document.getElementById('info-horario-inicio').value = item.horarioInicio || '';
+            document.getElementById('info-horario-termino').value = item.horarioTermino || '';
+            document.getElementById('info-responsavel-local').value = item.responsavelLocal || '';
+            document.getElementById('info-contato-local').value = item.contatoLocal || '';
+            document.getElementById('info-vistoriador').value = item.vistoriador || '';
+            document.getElementById('info-matricula').value = item.matricula || '';
+            document.getElementById('info-salas-previstas').value = item.salasPrevistas || 0;
+            document.getElementById('info-cap-informada').value = item.capInformada || 0;
+            document.getElementById('info-cap-verificada').value = item.capVerificada || 0;
+
+            // Restaurar checklist com status e notas
+            if (item.checklist) {
+                Object.keys(item.checklist).forEach(key => {
+                    const itemData = item.checklist[key];
+                    const status = typeof itemData === 'object' ? itemData.status : itemData;
+                    const score = typeof itemData === 'object' ? itemData.score : (status === 'C' ? BAREMA_ITEMS.find(b=>b.id===key)?.max : 0);
+
+                    const radio = document.querySelector(`input[name="item-status-${key}"][value="${status}"]`);
+                    if (radio) radio.checked = true;
+
+                    const scoreInput = document.getElementById(`item-score-${key}`);
+                    if (scoreInput) {
+                        scoreInput.value = score;
+                        scoreInput.disabled = (status === 'NA');
+                    }
+                });
+            }
+
+            // Restaurar capacidade
+            document.getElementById('capacity-table-body').innerHTML = '';
+            if (item.capacity && item.capacity.length > 0) {
+                item.capacity.forEach(c => addCapacityRow(c));
+            } else {
+                addCapacityRow();
+            }
+
+            // Restaurar NCs
+            document.getElementById('nc-table-body').innerHTML = '';
+            if (item.nonConformities && item.nonConformities.length > 0) {
+                item.nonConformities.forEach(nc => addNcRow(nc));
+            } else {
+                addNcRow();
+            }
+
+            // Parecer
+            document.getElementById('parecer-fundamentacao').value = item.fundamentacao || '';
+            document.getElementById('parecer-revistoria').value = item.revistoria || 'Não';
+            document.getElementById('parecer-data-limite').value = item.dataLimite || '';
+            document.getElementById('parecer-data-fgv').value = item.dataFgv || '';
+            document.getElementById('parecer-obs').value = item.observacoes || '';
+
+            const parecerRadio = document.querySelector(`input[name="parecer-final"][value="${item.parecerFinal}"]`);
+            if (parecerRadio) parecerRadio.checked = true;
+
+            calculateScore();
+            switchTab('form');
+        }
+
+        // Excluir Vistoria
+        async function deleteInspection(id) {
+            if (confirm('Tem certeza que deseja excluir este registro de vistoria?')) {
+                const { error } = await supabaseClient.from('inspections').delete().eq('id', id).eq('user_id', activeUser.id);
+                if (error) { alert('Erro ao excluir do Supabase: ' + error.message); return; }
+                inspections = inspections.filter(i => i.id !== id);
+                renderInspectionList(); updateDashboard();
+            }
+        }
+
+        // Resetar Formulário
+        function resetForm() {
+            currentInspectionId = null;
+            document.getElementById('inspection-form').reset();
+            renderChecklist();
+            document.getElementById('capacity-table-body').innerHTML = '';
+            addCapacityRow();
+            document.getElementById('nc-table-body').innerHTML = '';
+            addNcRow();
+            calculateScore();
+        }
+
+        // Renderizar Lista Cadastrada
+        function renderInspectionList() {
+            const tbody = document.getElementById('list-table-body');
+            const search = document.getElementById('filter-search').value.toLowerCase();
+            const filterParecer = document.getElementById('filter-parecer').value;
+
+            tbody.innerHTML = '';
+
+            const filtered = inspections.filter(item => {
+                const matchSearch = item.unidade.toLowerCase().includes(search) ||
+                                    item.municipio.toLowerCase().includes(search) ||
+                                    item.vistoriador.toLowerCase().includes(search);
+                const matchParecer = filterParecer === '' || item.parecerFinal === filterParecer;
+                return matchSearch && matchParecer;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">Nenhuma vistoria encontrada.</td></tr>`;
+                return;
+            }
+
+            filtered.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+                let badgeColor = 'bg-slate-100 text-slate-700';
+                if (item.parecerFinal === 'FAVORÁVEL') badgeColor = 'bg-emerald-100 text-emerald-800';
+                else if (item.parecerFinal === 'FAVORÁVEL CONDICIONADO') badgeColor = 'bg-amber-100 text-amber-800';
+                else if (item.parecerFinal === 'NÃO FAVORÁVEL') badgeColor = 'bg-rose-100 text-rose-800';
+
+                tr.innerHTML = `
+                    <td class="p-4 font-mono text-xs">${item.data || '-'}</td>
+                    <td class="p-4 font-semibold text-slate-800">${item.unidade}</td>
+                    <td class="p-4">${item.municipio}</td>
+                    <td class="p-4 text-xs">${item.vistoriador}</td>
+                    <td class="p-4 text-center font-semibold text-slate-700">${item.score?.obtained || 0} / ${item.score?.applicableMax || 100}</td>
+                    <td class="p-4 text-center font-bold text-brand-600">${item.score?.percentage || 0}%</td>
+                    <td class="p-4 text-center">
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeColor}">${item.parecerFinal}</span>
+                    </td>
+                    <td class="p-4 text-right space-x-2">
+                        <button onclick="editInspection('${item.id}')" class="text-brand-600 hover:text-brand-800 p-1" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="deleteInspection('${item.id}')" class="text-rose-600 hover:text-rose-800 p-1" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Atualizar Métricas e Gráficos do Dashboard
+        function updateDashboard() {
+            const total = inspections.length;
+            const fav = inspections.filter(i => i.parecerFinal === 'FAVORÁVEL').length;
+            const cond = inspections.filter(i => i.parecerFinal === 'FAVORÁVEL CONDICIONADO').length;
+            const nfav = inspections.filter(i => i.parecerFinal === 'NÃO FAVORÁVEL').length;
+
+            const avgScore = total > 0 ? (inspections.reduce((acc, i) => acc + (i.score?.percentage || 0), 0) / total).toFixed(1) : 0;
+
+            document.getElementById('dash-stat-total').innerText = total;
+            document.getElementById('dash-stat-fav').innerText = fav;
+            document.getElementById('dash-stat-cond').innerText = cond;
+            document.getElementById('dash-stat-nfav').innerText = nfav;
+            document.getElementById('dash-stat-avg').innerText = `${avgScore}%`;
+
+            // Atualizar Tabela Recente no Dashboard
+            const dashTbody = document.getElementById('dash-table-body');
+            dashTbody.innerHTML = '';
+            inspections.slice(-5).reverse().forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+                let badgeColor = 'bg-slate-100 text-slate-700';
+                if (item.parecerFinal === 'FAVORÁVEL') badgeColor = 'bg-emerald-100 text-emerald-800';
+                else if (item.parecerFinal === 'FAVORÁVEL CONDICIONADO') badgeColor = 'bg-amber-100 text-amber-800';
+                else if (item.parecerFinal === 'NÃO FAVORÁVEL') badgeColor = 'bg-rose-100 text-rose-800';
+
+                tr.innerHTML = `
+                    <td class="p-4 font-medium text-slate-800">${item.unidade}</td>
+                    <td class="p-4">${item.municipio}</td>
+                    <td class="p-4 text-center font-semibold text-slate-700">${item.score?.obtained || 0} pts</td>
+                    <td class="p-4 text-center font-bold text-brand-600">${item.score?.percentage || 0}%</td>
+                    <td class="p-4 text-center">${item.score?.hasCriticalNC ? '<span class="text-rose-600 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Sim</span>' : '<span class="text-emerald-600">Não</span>'}</td>
+                    <td class="p-4 text-center"><span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeColor}">${item.parecerFinal}</span></td>
+                    <td class="p-4 text-right">
+                        <button onclick="editInspection('${item.id}')" class="text-xs text-brand-600 font-semibold hover:underline">Abrir</button>
+                    </td>
+                `;
+                dashTbody.appendChild(tr);
+            });
+
+            // Render Chart Parecer
+            const ctxParecer = document.getElementById('chart-parecer').getContext('2d');
+            if (chartParecer) chartParecer.destroy();
+            chartParecer = new Chart(ctxParecer, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Favorável', 'Fav. Condicionado', 'Não Favorável'],
+                    datasets: [{
+                        data: [fav, cond, nfav],
+                        backgroundColor: ['#22c55e', '#f59e0b', '#f43f5e']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+
+            // Render Chart Categories (Média de Aproveitamento por Categoria)
+            const catTotals = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+            const catMaxes = { A: 28, B: 25, C: 15, D: 20, E: 12 };
+
+            if (total > 0) {
+                inspections.forEach(i => {
+                    if (i.score?.catScores) {
+                        Object.keys(catTotals).forEach(c => {
+                            catTotals[c] += i.score.catScores[c] || 0;
+                        });
+                    }
+                });
+            }
+
+            const catAverages = Object.keys(catTotals).map(c => {
+                return total > 0 ? Math.round((catTotals[c] / (catMaxes[c] * total)) * 100) : 0;
+            });
+
+            const ctxCategories = document.getElementById('chart-categories').getContext('2d');
+            if (chartCategories) chartCategories.destroy();
+            chartCategories = new Chart(ctxCategories, {
+                type: 'bar',
+                data: {
+                    labels: ['A. Água/Higiene', 'B. Salas/Conforto', 'C. Acessibilidade', 'D. Segurança', 'E. Logística'],
+                    datasets: [{
+                        label: '% Média Conforme',
+                        data: catAverages,
+                        backgroundColor: '#0284c7',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { min: 0, max: 100 } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // LocalStorage Persistência
+        function saveToLocalStorage() { /* Persistência real é feita exclusivamente no Supabase. */ }
+
+        function loadFromLocalStorage() { inspections = []; /* Dados vêm do Supabase após login. */ }
+
+        async function resetData() {
+            if (!activeUser) return;
+            if (confirm('Atenção: isso excluirá permanentemente todas as suas vistorias salvas na nuvem. Deseja continuar?')) {
+                const { error } = await supabaseClient.from('inspections').delete().eq('user_id', activeUser.id);
+                if (error) { alert('Erro ao limpar vistorias: ' + error.message); return; }
+                inspections = []; updateDashboard(); renderInspectionList(); resetForm();
+            }
+        }
+
+        // Dados Demonstrativos (Mock) para Visualização Imediata
+        function loadMockData() {
+            inspections = [
+                {
+                    id: '1',
+                    unidade: 'CEM de Palmas (Centro)',
+                    municipio: 'Palmas',
+                    endereco: 'Quadra 104 Sul, Av. LO 03',
+                    data: '2026-10-15',
+                    turno: 'Ambos (Matutino/Vesperino)',
+                    horarioInicio: '08:00',
+                    horarioTermino: '17:00',
+                    responsavelLocal: 'Maria Oliveira',
+                    contatoLocal: '(63) 99881-1122',
+                    vistoriador: 'Carlos Eduardo Mendes',
+                    matricula: '88412-1',
+                    salasPrevistas: 25,
+                    capInformada: 750,
+                    capVerificada: 720,
+                    score: {
+                        obtained: 97,
+                        applicableMax: 100,
+                        percentage: 97.0,
+                        hasCriticalNC: false,
+                        recommendedParecer: 'FAVORÁVEL',
+                        catScores: { A: 28, B: 25, C: 12, D: 20, E: 12 }
+                    },
+                    checklist: {
+                        a1: { status: 'C', score: 7 }, a2: { status: 'C', score: 7 }, a3: { status: 'C', score: 7 }, a4: { status: 'C', score: 7 },
+                        b1: { status: 'C', score: 5 }, b2: { status: 'C', score: 5 }, b3: { status: 'C', score: 5 }, b4: { status: 'C', score: 5 }, b5: { status: 'C', score: 5 },
+                        c1: { status: 'C', score: 5 }, c2: { status: 'C', score: 5 }, c3: { status: 'C', score: 2 },
+                        d1: { status: 'C', score: 4 }, d2: { status: 'C', score: 4 }, d3: { status: 'C', score: 4 }, d4: { status: 'C', score: 4 }, d5: { status: 'C', score: 4 },
+                        e1: { status: 'C', score: 4 }, e2: { status: 'C', score: 4 }, e3: { status: 'C', score: 4 }
+                    },
+                    capacity: [{ bloco: 'Bloco Geral', salas: '25', capacidade: '720', terreo: '40', superior: '60' }],
+                    nonConformities: [{ item: 'C3 - Sinalização', achado: 'Placas indicativas parciais na recepção', medida: 'Instalação de faixas provisórias / FGV', prazo: '3 dias' }],
+                    parecerFinal: 'FAVORÁVEL',
+                    fundamentacao: 'Local em excelentes condições operacionais. Pequena ajuste de sinalização será efetuado.',
+                    revistoria: 'Não',
+                    dataLimite: '',
+                    dataFgv: '2026-10-16',
+                    observacoes: 'Ambientes limpos, ar-condicionado funcionando.',
+                    updatedAt: new Date().toISOString()
+                },
+                {
+                    id: '2',
+                    unidade: 'Escola Estadual Araguaína Norte',
+                    municipio: 'Araguaína',
+                    endereco: 'Av. Filadélfia, Bairro São João',
+                    data: '2026-10-18',
+                    turno: 'Matutino',
+                    horarioInicio: '08:30',
+                    horarioTermino: '12:00',
+                    responsavelLocal: 'João Pereira',
+                    contatoLocal: '(63) 98112-3344',
+                    vistoriador: 'Ana Paula Rocha',
+                    matricula: '99231-0',
+                    salasPrevistas: 18,
+                    capInformada: 540,
+                    capVerificada: 500,
+                    score: {
+                        obtained: 82,
+                        applicableMax: 100,
+                        percentage: 82.0,
+                        hasCriticalNC: false,
+                        recommendedParecer: 'FAVORÁVEL CONDICIONADO',
+                        catScores: { A: 21, B: 20, C: 15, D: 16, E: 10 }
+                    },
+                    checklist: {
+                        a1: { status: 'C', score: 7 }, a2: { status: 'C', score: 7 }, a3: { status: 'NC', score: 0 }, a4: { status: 'C', score: 7 },
+                        b1: { status: 'C', score: 5 }, b2: { status: 'C', score: 5 }, b3: { status: 'NC', score: 0 }, b4: { status: 'C', score: 5 }, b5: { status: 'C', score: 5 },
+                        c1: { status: 'C', score: 5 }, c2: { status: 'C', score: 5 }, c3: { status: 'C', score: 5 },
+                        d1: { status: 'C', score: 4 }, d2: { status: 'C', score: 4 }, d3: { status: 'C', score: 4 }, d4: { status: 'C', score: 4 }, d5: { status: 'NC', score: 0 },
+                        e1: { status: 'C', score: 4 }, e2: { status: 'C', score: 4 }, e3: { status: 'NC', score: 2 }
+                    },
+                    capacity: [{ bloco: 'Bloco A', salas: '10', capacidade: '300', terreo: '100', superior: '0' }],
+                    nonConformities: [{ item: 'B3 - Ventiladores', achado: '2 ventiladores da sala 04 queimados', medida: 'Substituição dos aparelhos', prazo: '4 dias' }],
+                    parecerFinal: 'FAVORÁVEL CONDICIONADO',
+                    fundamentacao: 'Necessário comprovação de troca de ventiladores e reparo no banheiro masculino antes da prova.',
+                    revistoria: 'Sim',
+                    dataLimite: '2026-10-28',
+                    dataFgv: '2026-10-19',
+                    observacoes: 'Aguardando rechecagem da equipe local.',
+                    updatedAt: new Date().toISOString()
+                },
+                {
+                    id: '3',
+                    unidade: 'Colégio Estadual Gurupi Central',
+                    municipio: 'Gurupi',
+                    endereco: 'Rua 07, Centro',
+                    data: '2026-10-20',
+                    turno: 'Vesperino',
+                    horarioInicio: '13:30',
+                    horarioTermino: '18:00',
+                    responsavelLocal: 'Roberto Lima',
+                    contatoLocal: '(63) 98400-5566',
+                    vistoriador: 'Carlos Eduardo Mendes',
+                    matricula: '88412-1',
+                    salasPrevistas: 12,
+                    capInformada: 360,
+                    capVerificada: 300,
+                    score: {
+                        obtained: 64,
+                        applicableMax: 100,
+                        percentage: 64.0,
+                        hasCriticalNC: true,
+                        recommendedParecer: 'NÃO FAVORÁVEL',
+                        catScores: { A: 14, B: 15, C: 5, D: 18, E: 12 }
+                    },
+                    checklist: {
+                        a1: { status: 'NC', score: 0 }, a2: { status: 'NC', score: 0 }, a3: { status: 'C', score: 7 }, a4: { status: 'C', score: 7 },
+                        b1: { status: 'C', score: 5 }, b2: { status: 'C', score: 5 }, b3: { status: 'C', score: 5 }, b4: { status: 'NC', score: 0 }, b5: { status: 'C', score: 5 },
+                        c1: { status: 'NC', score: 0 }, c2: { status: 'NC', score: 0 }, c3: { status: 'C', score: 5 },
+                        d1: { status: 'C', score: 4 }, d2: { status: 'C', score: 4 }, d3: { status: 'C', score: 4 }, d4: { status: 'C', score: 4 }, d5: { status: 'C', score: 2 },
+                        e1: { status: 'C', score: 4 }, e2: { status: 'C', score: 4 }, e3: { status: 'C', score: 4 }
+                    },
+                    capacity: [{ bloco: 'Bloco Único', salas: '12', capacidade: '300', terreo: '50', superior: '50' }],
+                    nonConformities: [{ item: 'A1 - Abastecimento de Água', achado: 'Bomba de água queimada, sem abastecimento nos banheiros superiores', medida: 'Conserto imediato da bomba hidráulica', prazo: '2 dias' }],
+                    parecerFinal: 'NÃO FAVORÁVEL',
+                    fundamentacao: 'Inexistência de abastecimento de água contínuo (Item Crítico A1) e falta de acessibilidade plena.',
+                    revistoria: 'Sim',
+                    dataLimite: '2026-10-30',
+                    dataFgv: '2026-10-21',
+                    observacoes: 'Local interditado tecnicamente até saneamento dos itens críticos.',
+                    updatedAt: new Date().toISOString()
+                }
+            ];
+
+            saveToLocalStorage();
+            updateDashboard();
+            renderInspectionList();
+        }
+
+        // Exportação de Dados JSON / CSV
+        function exportDataJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(inspections, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `vistorias_ses_to_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function exportDataCSV() {
+            if (inspections.length === 0) {
+                alert('Não há dados para exportar.');
+                return;
+            }
+
+            let csv = 'ID;Data;Unidade;Municipio;Vistoriador;Pontos_Obtidos;Pontos_Aplicaveis;Indice_Barema;Parecer_Final\n';
+            inspections.forEach(i => {
+                csv += `"${i.id}";"${i.data}";"${i.unidade}";"${i.municipio}";"${i.vistoriador}";"${i.score?.obtained || 0}";"${i.score?.applicableMax || 100}";"${i.score?.percentage || 0}%";"${i.parecerFinal}"\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `vistorias_ses_to_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</div>
+</body>
+</html>
