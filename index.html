@@ -77,6 +77,21 @@
         <p class="text-xs text-slate-400 text-center">Acesso restrito a usuários autorizados. O cadastro inicial é exclusivo do administrador principal.</p>
       </div>
     </section>
+    <section id="forced-password-gate" class="hidden fixed inset-0 z-[100] min-h-screen items-center justify-center p-6 bg-slate-900">
+      <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-5">
+        <div class="text-center">
+          <div class="inline-flex items-center justify-center h-14 w-14 rounded-xl bg-amber-500 text-white text-2xl mb-3"><i class="fa-solid fa-key"></i></div>
+          <h2 class="text-xl font-bold text-slate-900">Defina sua nova senha</h2>
+          <p class="text-sm text-slate-600 mt-2">Por segurança, você precisa trocar a senha temporária antes de acessar o sistema.</p>
+        </div>
+        <form id="forced-password-form" class="space-y-4">
+          <div><label for="first-new-password" class="block text-sm font-medium mb-1">Nova senha</label><input id="first-new-password" type="password" required minlength="8" autocomplete="new-password" class="w-full border border-slate-300 rounded-lg p-3" placeholder="Mínimo de 8 caracteres"></div>
+          <div><label for="first-confirm-password" class="block text-sm font-medium mb-1">Confirme a nova senha</label><input id="first-confirm-password" type="password" required minlength="8" autocomplete="new-password" class="w-full border border-slate-300 rounded-lg p-3" placeholder="Digite a senha novamente"></div>
+          <button id="forced-password-submit" class="w-full bg-sky-700 hover:bg-sky-800 text-white rounded-lg p-3 font-semibold" type="submit">Salvar nova senha e continuar</button>
+          <p id="forced-password-message" class="text-sm text-center" role="status"></p>
+        </form>
+      </div>
+    </section>
     <div id="app-root" class="hidden flex flex-col min-h-screen">
 
 
@@ -142,7 +157,7 @@
           <form id="invite-user-form" class="flex flex-col sm:flex-row gap-3">
             <div class="flex-1"><label for="invite-user-email" class="block text-sm font-medium text-slate-700 mb-1">E-mail do usuário</label>
             <input id="invite-user-email" type="email" required class="w-full border border-slate-300 rounded-lg p-3" placeholder="nome@exemplo.com"></div>
-            <div class="flex items-end"><button id="invite-user-submit" type="submit" class="bg-sky-700 hover:bg-sky-800 text-white rounded-lg px-5 py-3 font-semibold"><i class="fa-solid fa-paper-plane mr-2"></i>Enviar convite</button></div>
+            <div class="flex items-end"><button id="invite-user-submit" type="submit" class="bg-sky-700 hover:bg-sky-800 text-white rounded-lg px-5 py-3 font-semibold"><i class="fa-solid fa-user-plus mr-2"></i>Cadastrar usuário</button></div>
           </form>
           <p id="invite-user-message" class="text-sm" role="status"></p>
         </section>
@@ -766,6 +781,16 @@
                     setAuthMessage(message);
                     return;
                 }
+                if (access.forcePasswordChange === true) {
+                    document.getElementById('auth-gate').classList.add('hidden');
+                    document.getElementById('app-root').classList.add('hidden');
+                    const passwordGate = document.getElementById('forced-password-gate');
+                    passwordGate.classList.remove('hidden');
+                    passwordGate.classList.add('flex');
+                    return;
+                }
+                document.getElementById('forced-password-gate').classList.add('hidden');
+                document.getElementById('forced-password-gate').classList.remove('flex');
                 activeRole = access.role;
                 if (activeRole === 'principal_admin') document.getElementById('admin-users-button').classList.remove('hidden');
                 renderChecklist();
@@ -776,6 +801,8 @@
             } else {
                 activeRole = null;
                 inspections = [];
+                document.getElementById('forced-password-gate').classList.add('hidden');
+                document.getElementById('forced-password-gate').classList.remove('flex');
             }
         }
         function toggleUserManagement(force) {
@@ -791,7 +818,7 @@
             const input = document.getElementById('invite-user-email');
             const button = document.getElementById('invite-user-submit');
             const message = document.getElementById('invite-user-message');
-            button.disabled = true; button.textContent = 'Enviando...';
+            button.disabled = true; button.textContent = 'Cadastrando...';
             message.textContent = '';
             const { data, error } = await supabaseClient.functions.invoke('manage-users', {
                 body: { action: 'invite', email: input.value.trim() }
@@ -804,7 +831,7 @@
                 message.textContent = data.message || 'Convite enviado.';
                 input.value = '';
             }
-            button.disabled = false; button.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i>Enviar convite';
+            button.disabled = false; button.innerHTML = '<i class="fa-solid fa-user-plus mr-2"></i>Cadastrar usuário';
         });
         document.getElementById('auth-form').addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -826,7 +853,39 @@
             if (error) setAuthMessage('Não foi possível ativar a conta: ' + error.message);
             else setAuthMessage('Conta inicial criada. Confirme o e-mail, se solicitado, e entre com essa conta para ativar o perfil de administrador principal.', false);
         });
-        supabaseClient.auth.onAuthStateChange((_event, session) => { setTimeout(() => activateSession(session), 0); });
+        document.getElementById('forced-password-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const password = document.getElementById('first-new-password').value;
+            const confirmation = document.getElementById('first-confirm-password').value;
+            const button = document.getElementById('forced-password-submit');
+            const message = document.getElementById('forced-password-message');
+            if (password.length < 8) { message.className = 'text-sm text-center text-rose-600'; message.textContent = 'A senha precisa ter pelo menos 8 caracteres.'; return; }
+            if (password !== confirmation) { message.className = 'text-sm text-center text-rose-600'; message.textContent = 'As senhas não conferem.'; return; }
+            button.disabled = true; button.textContent = 'Salvando...';
+            message.textContent = '';
+            const { error: passwordError } = await supabaseClient.auth.updateUser({ password });
+            if (passwordError) {
+                message.className = 'text-sm text-center text-rose-600';
+                message.textContent = 'Não foi possível alterar a senha: ' + passwordError.message;
+                button.disabled = false; button.textContent = 'Salvar nova senha e continuar';
+                return;
+            }
+            const { data, error } = await supabaseClient.functions.invoke('manage-users', { body: { action: 'complete-password-change' } });
+            if (error || data?.error) {
+                message.className = 'text-sm text-center text-rose-600';
+                message.textContent = data?.error || error?.message || 'A senha foi alterada, mas não foi possível concluir a ativação. Tente novamente.';
+                button.disabled = false; button.textContent = 'Tentar novamente';
+                return;
+            }
+            message.className = 'text-sm text-center text-emerald-700';
+            message.textContent = 'Senha alterada. Abrindo o sistema...';
+            await supabaseClient.auth.refreshSession();
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            await activateSession(session);
+            document.getElementById('forced-password-form').reset();
+            button.disabled = false; button.textContent = 'Salvar nova senha e continuar';
+        });
+                supabaseClient.auth.onAuthStateChange((_event, session) => { setTimeout(() => activateSession(session), 0); });
         window.onload = async function() {
             renderChecklist();
             const { data: { session } } = await supabaseClient.auth.getSession();
